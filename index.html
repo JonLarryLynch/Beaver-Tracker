@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lincoln Park Wildlife Watch</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --forest:#1B2E1F;
+    --moss:#3F5C42;
+    --lagoon:#7A93A0;
+    --amber:#D9A441;   /* beaver */
+    --rust:#B2472A;    /* coyote */
+    --fox:#C97A3D;     /* fox */
+    --other:#5B6B7A;   /* other species */
+    --parchment:#F4EFE3;
+    --parchment-dark:#E9E1CF;
+    --ink:#2A2620;
+    --ink-soft:#5A5346;
+    --line:#D8CFB8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--forest);}
+  body{
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    overflow:hidden;
+  }
+  /* ---------- HEADER ---------- */
+  header{
+    background:var(--forest);
+    color:var(--parchment);
+    padding:14px 22px;
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    flex-wrap:wrap;
+    border-bottom:3px solid var(--amber);
+    z-index:20;
+  }
+  header h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:22px;
+    margin:0;
+    letter-spacing:0.2px;
+  }
+  header .tagline{
+    font-size:12.5px;
+    color:#C9C2AE;
+    font-style:italic;
+  }
+  header .stamp{
+    margin-left:auto;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--amber);
+    border:1px solid var(--amber);
+    border-radius:3px;
+    padding:3px 8px;
+    letter-spacing:0.5px;
+    white-space:nowrap;
+  }
+
+  /* ---------- LAYOUT ---------- */
+  .app{
+    display:flex;
+    flex:1;
+    min-height:0;
+  }
+  .map-wrap{
+    position:relative;
+    flex:1 1 62%;
+    min-width:0;
+  }
+  #map{
+    width:100%;
+    height:100%;
+    background:#DCE6DA;
+  }
+  .sidebar{
+    flex:0 0 400px;
+    max-width:420px;
+    background:var(--parchment);
+    display:flex;
+    flex-direction:column;
+    border-left:3px solid var(--forest);
+    min-height:0;
+  }
+
+  /* ---------- MAP CONTROLS ---------- */
+  .species-filter{
+    position:absolute;
+    top:14px;
+    left:14px;
+    z-index:400;
+    background:rgba(244,239,227,0.96);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 12px;
+    box-shadow:0 3px 10px rgba(0,0,0,0.18);
+    font-family:'Inter',sans-serif;
+  }
+  .species-filter .label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.8px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  .chip-row{display:flex;gap:6px;flex-wrap:wrap;max-width:210px;}
+  .chip{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    padding:5px 9px;
+    border-radius:999px;
+    border:1.5px solid var(--line);
+    background:#fff;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    user-select:none;
+    transition:transform .12s ease;
+  }
+  .chip:active{transform:scale(0.95);}
+  .chip.off{opacity:0.35;}
+  .chip .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+
+  .heat-toggle{
+    position:absolute;
+    bottom:18px;
+    left:14px;
+    z-index:400;
+    background:var(--forest);
+    color:var(--parchment);
+    border:none;
+    padding:9px 14px;
+    border-radius:8px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+    box-shadow:0 3px 10px rgba(0,0,0,0.3);
+    letter-spacing:0.2px;
+  }
+  .heat-toggle.active{background:var(--amber);color:var(--forest);}
+  .instructions{
+    position:absolute;
+    bottom:18px;
+    right:14px;
+    z-index:400;
+    background:rgba(27,46,31,0.9);
+    color:var(--parchment);
+    padding:8px 12px;
+    border-radius:8px;
+    font-size:12px;
+    max-width:210px;
+    line-height:1.4;
+  }
+
+  /* ---------- TABS ---------- */
+  .tabs{
+    display:flex;
+    border-bottom:2px solid var(--line);
+    flex:none;
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:12px 6px;
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:0.3px;
+    cursor:pointer;
+    color:var(--ink-soft);
+    border-bottom:3px solid transparent;
+    text-transform:uppercase;
+  }
+  .tab.active{
+    color:var(--forest);
+    border-bottom-color:var(--amber);
+    background:var(--parchment-dark);
+  }
+  .panel{
+    flex:1;
+    overflow-y:auto;
+    padding:18px 18px 30px;
+    display:none;
+  }
+  .panel.active{display:block;}
+
+  /* ---------- FORM ---------- */
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    font-weight:700;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+  }
+  select,input[type=datetime-local],textarea,input[type=text]{
+    width:100%;
+    padding:9px 10px;
+    border:1.5px solid var(--line);
+    border-radius:7px;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    background:#fff;
+    color:var(--ink);
+  }
+  textarea{resize:vertical;min-height:60px;}
+  .coord-box{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    background:#fff;
+    border:1.5px dashed var(--line);
+    border-radius:7px;
+    padding:9px 10px;
+    color:var(--ink-soft);
+  }
+  .coord-box.set{color:var(--forest);border-style:solid;border-color:var(--moss);}
+  .submit-btn{
+    width:100%;
+    background:var(--forest);
+    color:var(--parchment);
+    border:none;
+    padding:11px;
+    border-radius:8px;
+    font-weight:700;
+    font-size:13.5px;
+    letter-spacing:0.3px;
+    cursor:pointer;
+    margin-top:4px;
+  }
+  .submit-btn:disabled{background:#9aa79c;cursor:not-allowed;}
+  .hint{font-size:11.5px;color:var(--ink-soft);margin-top:-6px;margin-bottom:14px;line-height:1.4;}
+  .status-msg{font-size:12.5px;margin-top:8px;font-weight:600;}
+  .status-msg.ok{color:var(--moss);}
+  .status-msg.err{color:var(--rust);}
+
+  /* ---------- JOURNAL ---------- */
+  .journal-card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-left:5px solid var(--other);
+    border-radius:6px;
+    padding:10px 12px;
+    margin-bottom:10px;
+    position:relative;
+    box-shadow:0 1px 3px rgba(0,0,0,0.06);
+  }
+  .journal-card .top-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:4px;
+  }
+  .journal-card .species-tag{
+    font-weight:700;
+    font-size:13px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .journal-card .ts{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+  .journal-card .notes{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    line-height:1.4;
+    margin-top:3px;
+  }
+  .journal-card .del{
+    position:absolute;
+    top:8px;
+    right:8px;
+    background:none;
+    border:none;
+    color:#B7ABA0;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .journal-card .del:hover{color:var(--rust);}
+  .empty-state{
+    text-align:center;
+    padding:30px 10px;
+    color:var(--ink-soft);
+    font-size:13px;
+    line-height:1.6;
+  }
+
+  /* ---------- PATTERNS ---------- */
+  .stat-row{display:flex;gap:10px;margin-bottom:18px;}
+  .stat-box{
+    flex:1;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    text-align:center;
+  }
+  .stat-box .num{
+    font-family:'Fraunces',serif;
+    font-size:22px;
+    font-weight:600;
+    color:var(--forest);
+  }
+  .stat-box .cap{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    color:var(--ink-soft);
+    font-weight:600;
+  }
+  .chart-title{
+    font-family:'Fraunces',serif;
+    font-size:14.5px;
+    font-weight:600;
+    margin:20px 0 4px;
+    color:var(--forest);
+  }
+  .chart-sub{font-size:11.5px;color:var(--ink-soft);margin-bottom:10px;}
+  .bars{
+    display:flex;
+    align-items:flex-end;
+    gap:2px;
+    height:100px;
+    border-bottom:1.5px solid var(--line);
+    padding-bottom:2px;
+  }
+  .bar{
+    flex:1;
+    background:var(--moss);
+    border-radius:2px 2px 0 0;
+    min-height:2px;
+    position:relative;
+  }
+  .bar.peak{background:var(--amber);}
+  .bar-labels{display:flex;gap:2px;margin-top:4px;}
+  .bar-labels span{
+    flex:1;
+    text-align:center;
+    font-size:9px;
+    color:var(--ink-soft);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-soft);}
+  .legend-item .dot{width:9px;height:9px;border-radius:50%;}
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+
+  @media (max-width:820px){
+    .app{flex-direction:column;}
+    .map-wrap{flex:0 0 46vh;}
+    .sidebar{flex:1;max-width:none;border-left:none;border-top:3px solid var(--forest);}
+  }
+
+  /* leaflet popup styling */
+  .leaflet-popup-content-wrapper{
+    background:var(--parchment);
+    border-radius:8px;
+  }
+  .leaflet-popup-content{font-family:'Inter',sans-serif;font-size:13px;}
+  .popup-species{font-weight:700;font-family:'Fraunces',serif;font-size:15px;margin-bottom:2px;}
+  .popup-ts{font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A5346;margin-bottom:4px;}
+  .popup-del{
+    margin-top:6px;
+    background:var(--rust);
+    color:#fff;
+    border:none;
+    padding:4px 9px;
+    border-radius:5px;
+    font-size:11px;
+    cursor:pointer;
+  }
+
+  /* ---------- SIGN-IN ---------- */
+  .signin-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(27,46,31,0.92);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:2000;
+  }
+  .signin-card{
+    background:var(--parchment);
+    border-radius:12px;
+    padding:28px 26px;
+    width:320px;
+    max-width:90vw;
+    box-shadow:0 10px 30px rgba(0,0,0,0.4);
+  }
+  .signin-card h2{
+    font-family:'Fraunces',serif;
+    font-size:19px;
+    margin:0 0 6px;
+    color:var(--forest);
+  }
+  .signin-card p{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    line-height:1.5;
+    margin:0 0 16px;
+  }
+  .signin-note{
+    font-size:11px;
+    color:var(--ink-soft);
+    background:var(--parchment-dark);
+    border:1px dashed var(--line);
+    border-radius:6px;
+    padding:8px 10px;
+    margin-top:14px;
+    line-height:1.5;
+  }
+  .google-btn{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:#fff;
+    border:1.5px solid var(--line);
+    border-radius:7px;
+    padding:9px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink);
+    cursor:pointer;
+    margin-bottom:14px;
+  }
+  .divider{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    margin:2px 0 14px;
+  }
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line);}
+
+  .user-badge{
+    margin-left:14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Inter',sans-serif;
+  }
+  .user-badge .name-pill{
+    background:var(--parchment-dark);
+    color:var(--forest);
+    font-size:11.5px;
+    font-weight:700;
+    padding:4px 10px;
+    border-radius:999px;
+  }
+  .user-badge .switch-link{
+    font-size:11px;
+    color:#C9C2AE;
+    text-decoration:underline;
+    cursor:pointer;
+    background:none;
+    border:none;
+  }
+
+  /* ---------- DATE RANGE FILTER ---------- */
+  .date-range{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+  .date-range .dr-inputs{display:flex;gap:6px;align-items:center;}
+  .date-range input[type=date]{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    padding:5px 6px;
+    border:1.5px solid var(--line);
+    border-radius:6px;
+    width:118px;
+  }
+  .date-range .dr-clear{
+    font-size:10.5px;
+    color:var(--ink-soft);
+    text-decoration:underline;
+    cursor:pointer;
+    background:none;
+    border:none;
+    margin-top:6px;
+    padding:0;
+  }
+
+  #map.pin-ready{cursor:crosshair;}
+</style>
+</head>
+<body>
+
+<div class="signin-overlay" id="signinOverlay">
+  <div class="signin-card">
+    <h2>Welcome, watcher</h2>
+    <p>Sign in with Google so your sightings get credited to you in the field journal.</p>
+    <button class="google-btn" id="googleBtn">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6 29.6 4 24 4c-7.5 0-14 4.2-17.3 10.3z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.6 35.4 26.9 36.4 24 36.4c-5.2 0-9.6-3.3-11.2-7.9l-6.5 5C9.9 39.7 16.4 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.7l6.6 5.4C41.5 36.2 44 30.6 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+      Continue with Google
+    </button>
+    <div class="status-msg err" id="signinError"></div>
+  </div>
+</div>
+
+<header>
+  <h1>🦫 Lincoln Park Wildlife Watch</h1>
+  <span class="tagline">a field journal for beavers, coyotes, foxes &amp; friends</span>
+  <div class="user-badge" id="userBadge" style="display:none;">
+    <span class="name-pill" id="nameDisplay"></span>
+    <button class="switch-link" id="switchUserBtn">sign out</button>
+  </div>
+  <span class="stamp" id="totalStamp">0 sightings logged</span>
+</header>
+
+<div class="app">
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="species-filter">
+      <div class="label">Show on map</div>
+      <div class="chip-row" id="chipRow"></div>
+      <div class="date-range">
+        <div class="label">Date range</div>
+        <div class="dr-inputs">
+          <input type="date" id="dateFrom">
+          <span style="font-size:11px;color:var(--ink-soft);">to</span>
+          <input type="date" id="dateTo">
+        </div>
+        <button class="dr-clear" id="dateClear">Clear dates</button>
+      </div>
+    </div>
+    <button class="heat-toggle" id="heatToggle">Show heatmap</button>
+    <div class="instructions" id="mapInstructions">Choose a species in the sidebar, then click the map to drop a pin. Drag the pin to fine-tune it.</div>
+  </div>
+
+  <div class="sidebar">
+    <div class="tabs">
+      <div class="tab active" data-tab="log">Log Sighting</div>
+      <div class="tab" data-tab="journal">Field Journal</div>
+      <div class="tab" data-tab="patterns">Patterns</div>
+    </div>
+
+    <div class="panel active" id="panel-log">
+      <div class="field">
+        <label>Species</label>
+        <select id="speciesSelect">
+          <option value="" selected>— Choose a species first —</option>
+          <option value="beaver">🦫 Beaver</option>
+          <option value="coyote">🐺 Coyote</option>
+          <option value="fox">🦊 Fox</option>
+          <option value="other">🐾 Other (type below)</option>
+        </select>
+      </div>
+      <div class="field" id="customLabelField" style="display:none;">
+        <label>What did you see?</label>
+        <input type="text" id="customLabel" placeholder="e.g. Great Blue Heron, White-tailed Deer">
+      </div>
+      <div class="field">
+        <label>Location</label>
+        <div class="coord-box" id="coordBox">Pick a species above, then click the map</div>
+      </div>
+      <div class="field">
+        <label>Date &amp; time seen</label>
+        <input type="datetime-local" id="tsInput">
+      </div>
+      <div class="hint">Defaults to right now — change it if you're logging a sighting from earlier.</div>
+      <div class="field">
+        <label>Notes (optional)</label>
+        <textarea id="notesInput" placeholder="Behavior, group size, anything worth remembering..."></textarea>
+      </div>
+      <button class="submit-btn" id="submitBtn" disabled>Pick a spot on the map first</button>
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+
+    <div class="panel" id="panel-journal">
+      <div id="journalList"></div>
+    </div>
+
+    <div class="panel" id="panel-patterns">
+      <div class="stat-row">
+        <div class="stat-box"><div class="num" id="statTotal">0</div><div class="cap">Total sightings</div></div>
+        <div class="stat-box"><div class="num" id="statHour">—</div><div class="cap">Peak hour</div></div>
+        <div class="stat-box"><div class="num" id="statSpecies">—</div><div class="cap">Most seen</div></div>
+      </div>
+
+      <div class="chart-title">Time of day</div>
+      <div class="chart-sub">When sightings tend to happen, hour by hour.</div>
+      <div class="bars" id="hourBars"></div>
+      <div class="bar-labels">
+        <span>12am</span><span></span><span></span><span></span><span>6am</span><span></span><span></span><span></span><span>12pm</span><span></span><span></span><span></span><span>6pm</span><span></span><span></span><span></span><span>11pm</span>
+      </div>
+
+      <div class="chart-title">Time of year</div>
+      <div class="chart-sub">Seasonal patterns — handy for spotting summer coyote/fox activity.</div>
+      <div class="bars" id="monthBars"></div>
+      <div class="bar-labels">
+        <span>J</span><span>F</span><span>M</span><span>A</span><span>M</span><span>J</span><span>J</span><span>A</span><span>S</span><span>O</span><span>N</span><span>D</span>
+      </div>
+
+      <div class="legend-row" id="legendRow"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAVBgpe-jt7zc1zhqpxvFidtE3Mq_5-bnM",
+  authDomain: "the-beaver-project.firebaseapp.com",
+  databaseURL: "https://the-beaver-project-default-rtdb.firebaseio.com",
+  projectId: "the-beaver-project",
+  storageBucket: "the-beaver-project.firebasestorage.app",
+  messagingSenderId: "796121700492",
+  appId: "1:796121700492:web:8f9d51e59d5cfcdc5843a9",
+  measurementId: "G-WZTT98KFMD"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const sightingsCollection = db.collection('sightings');
+
+const SPECIES = {
+  beaver: { label:'Beaver', emoji:'🦫', color:'#D9A441' },
+  coyote: { label:'Coyote', emoji:'🐺', color:'#B2472A' },
+  fox:    { label:'Fox',    emoji:'🦊', color:'#C97A3D' },
+  other:  { label:'Other',  emoji:'🐾', color:'#5B6B7A' }
+};
+
+let sightings = [];       // {id, species, customLabel, lat, lng, timestamp, notes, reporterName}
+let activeSpecies = new Set(Object.keys(SPECIES));
+let pickedLatLng = null;
+let heatOn = false;
+let heatLayer = null;
+let markerLayer = null;
+let tempMarker = null;    // draggable pin while composing a new sighting
+let profile = null;       // { name }
+let dateFrom = null;
+let dateTo = null;
+
+// ---------- MAP ----------
+const map = L.map('map', { zoomControl:true }).setView([41.9450, -87.6370], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:19,
+  attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+markerLayer = L.layerGroup().addTo(map);
+
+function updateCoordBoxText(latlng){
+  const box = document.getElementById('coordBox');
+  box.textContent = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)} — drag the pin if it's not quite right`;
+  box.classList.add('set');
+}
+
+function placeTempMarker(latlng){
+  pickedLatLng = latlng;
+  const sp = document.getElementById('speciesSelect').value || 'other';
+  if(tempMarker){
+    tempMarker.setLatLng(latlng);
+    tempMarker.setIcon(speciesDivIcon(sp));
+  } else {
+    tempMarker = L.marker(latlng, { icon: speciesDivIcon(sp), draggable:true, autoPan:true });
+    tempMarker.on('dragend', ()=>{
+      pickedLatLng = tempMarker.getLatLng();
+      updateCoordBoxText(pickedLatLng);
+    });
+    tempMarker.addTo(map);
+  }
+  updateCoordBoxText(latlng);
+  updateSubmitState();
+}
+
+function clearTempMarker(){
+  if(tempMarker){ map.removeLayer(tempMarker); tempMarker = null; }
+  pickedLatLng = null;
+}
+
+map.on('click', (e) => {
+  const sp = document.getElementById('speciesSelect').value;
+  if(!sp){
+    const box = document.getElementById('coordBox');
+    box.textContent = 'Choose a species above first, then click the map';
+    box.classList.remove('set');
+    return;
+  }
+  placeTempMarker(e.latlng);
+});
+
+function updateMapCursor(){
+  const sp = document.getElementById('speciesSelect').value;
+  document.getElementById('map').classList.toggle('pin-ready', !!sp);
+}
+
+function speciesDivIcon(sp){
+  const cfg = SPECIES[sp] || SPECIES.other;
+  return L.divIcon({
+    html:`<div style="background:${cfg.color};width:30px;height:30px;border-radius:50% 50% 50% 0;
+          transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;
+          border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,0.35);">
+          <span style="transform:rotate(45deg);font-size:15px;">${cfg.emoji}</span></div>`,
+    className:'', iconSize:[30,30], iconAnchor:[15,28], popupAnchor:[0,-26]
+  });
+}
+
+// ---------- FIRESTORE ----------
+let unsubscribeSightings = null;
+
+function startSightingsListener(){
+  if(unsubscribeSightings) unsubscribeSightings();
+  unsubscribeSightings = sightingsCollection.onSnapshot((snapshot)=>{
+    sightings = snapshot.docs.map(doc => doc.data());
+    sightings.sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
+    renderAll();
+  }, (err)=>{
+    console.error('Sightings listener error', err);
+  });
+}
+
+async function saveSighting(s){
+  await sightingsCollection.doc(s.id).set(s);
+}
+async function deleteSighting(id){
+  try{
+    await sightingsCollection.doc(id).delete();
+  }catch(e){
+    alert("Couldn't delete that entry. You can only remove sightings you reported yourself.");
+  }
+}
+
+// ---------- FORM ----------
+const speciesSelect = document.getElementById('speciesSelect');
+const customLabelField = document.getElementById('customLabelField');
+const customLabel = document.getElementById('customLabel');
+const tsInput = document.getElementById('tsInput');
+const notesInput = document.getElementById('notesInput');
+const submitBtn = document.getElementById('submitBtn');
+const statusMsg = document.getElementById('statusMsg');
+const coordBox = document.getElementById('coordBox');
+
+function nowLocalString(){
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+}
+tsInput.value = nowLocalString();
+
+speciesSelect.addEventListener('change', ()=>{
+  customLabelField.style.display = speciesSelect.value === 'other' ? 'block' : 'none';
+  updateMapCursor();
+  if(tempMarker && speciesSelect.value){
+    tempMarker.setIcon(speciesDivIcon(speciesSelect.value));
+  }
+  if(!speciesSelect.value){
+    const box = document.getElementById('coordBox');
+    if(!pickedLatLng){
+      box.textContent = 'Pick a species above, then click the map';
+      box.classList.remove('set');
+    }
+  }
+});
+
+function updateSubmitState(){
+  if(!speciesSelect.value){
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Choose a species first';
+  } else if(!pickedLatLng){
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Now click the map to place a pin';
+  } else {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Log this sighting';
+  }
+}
+
+submitBtn.addEventListener('click', async ()=>{
+  if(!pickedLatLng) return;
+  const species = speciesSelect.value;
+  const label = species === 'other' ? customLabel.value.trim() : '';
+  if(species === 'other' && !label){
+    statusMsg.textContent = 'Tell us what you saw first.';
+    statusMsg.className = 'status-msg err';
+    return;
+  }
+  if(!tsInput.value){
+    statusMsg.textContent = 'Please set a date and time.';
+    statusMsg.className = 'status-msg err';
+    return;
+  }
+  const entry = {
+    id: (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
+    species,
+    customLabel: label,
+    lat: pickedLatLng.lat,
+    lng: pickedLatLng.lng,
+    timestamp: new Date(tsInput.value).toISOString(),
+    notes: notesInput.value.trim(),
+    reporterName: profile ? profile.name : '',
+    reporterId: auth.currentUser ? auth.currentUser.uid : null
+  };
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving...';
+  try{
+    await saveSighting(entry);
+    statusMsg.textContent = 'Sighting logged. Thanks for keeping watch.';
+    statusMsg.className = 'status-msg ok';
+    // reset form
+    clearTempMarker();
+    coordBox.textContent = 'Pick a species above, then click the map';
+    coordBox.classList.remove('set');
+    speciesSelect.value = '';
+    customLabelField.style.display = 'none';
+    customLabel.value = '';
+    updateMapCursor();
+    notesInput.value = '';
+    tsInput.value = nowLocalString();
+  }catch(e){
+    statusMsg.textContent = 'Something went wrong saving that. Try again.';
+    statusMsg.className = 'status-msg err';
+  }
+  updateSubmitState();
+});
+
+// ---------- TABS ----------
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- SPECIES FILTER CHIPS ----------
+const chipRow = document.getElementById('chipRow');
+Object.entries(SPECIES).forEach(([key, cfg])=>{
+  const chip = document.createElement('div');
+  chip.className = 'chip';
+  chip.dataset.species = key;
+  chip.innerHTML = `<span class="dot" style="background:${cfg.color}"></span>${cfg.emoji} ${cfg.label}`;
+  chip.addEventListener('click', ()=>{
+    if(activeSpecies.has(key)){
+      activeSpecies.delete(key);
+      chip.classList.add('off');
+    } else {
+      activeSpecies.add(key);
+      chip.classList.remove('off');
+    }
+    renderAll();
+  });
+  chipRow.appendChild(chip);
+});
+
+// ---------- HEATMAP TOGGLE ----------
+document.getElementById('heatToggle').addEventListener('click', ()=>{
+  heatOn = !heatOn;
+  document.getElementById('heatToggle').classList.toggle('active', heatOn);
+  document.getElementById('heatToggle').textContent = heatOn ? 'Hide heatmap' : 'Show heatmap';
+  renderMap();
+});
+
+// ---------- DATE RANGE FILTER ----------
+const dateFromInput = document.getElementById('dateFrom');
+const dateToInput = document.getElementById('dateTo');
+document.getElementById('dateClear').addEventListener('click', ()=>{
+  dateFromInput.value = '';
+  dateToInput.value = '';
+  dateFrom = null;
+  dateTo = null;
+  renderAll();
+});
+dateFromInput.addEventListener('change', ()=>{
+  dateFrom = dateFromInput.value ? new Date(dateFromInput.value + 'T00:00:00') : null;
+  renderAll();
+});
+dateToInput.addEventListener('change', ()=>{
+  dateTo = dateToInput.value ? new Date(dateToInput.value + 'T23:59:59') : null;
+  renderAll();
+});
+
+// ---------- RENDER: MAP ----------
+function filteredSightings(){
+  return sightings.filter(s=>{
+    if(!activeSpecies.has(s.species)) return false;
+    const dt = new Date(s.timestamp);
+    if(dateFrom && dt < dateFrom) return false;
+    if(dateTo && dt > dateTo) return false;
+    return true;
+  });
+}
+
+function renderMap(){
+  markerLayer.clearLayers();
+  if(heatLayer){ map.removeLayer(heatLayer); heatLayer = null; }
+
+  const list = filteredSightings();
+
+  if(heatOn){
+    const pts = list.map(s => [s.lat, s.lng, 0.6]);
+    heatLayer = L.heatLayer(pts, { radius:28, blur:22, maxZoom:17 }).addTo(map);
+  } else {
+    list.forEach(s=>{
+      const cfg = SPECIES[s.species] || SPECIES.other;
+      const marker = L.marker([s.lat, s.lng], { icon: speciesDivIcon(s.species) });
+      const dt = new Date(s.timestamp);
+      const label = s.species === 'other' && s.customLabel ? s.customLabel : cfg.label;
+      const canDelete = auth.currentUser && s.reporterId === auth.currentUser.uid;
+      marker.bindPopup(`
+        <div class="popup-species">${cfg.emoji} ${label}</div>
+        <div class="popup-ts">${dt.toLocaleString()}${s.reporterName ? ' · ' + escapeHtml(s.reporterName) : ''}</div>
+        ${s.notes ? `<div>${escapeHtml(s.notes)}</div>` : ''}
+        ${canDelete ? `<button class="popup-del" data-id="${s.id}">Delete entry</button>` : ''}
+      `);
+      marker.on('popupopen', (e)=>{
+        const btn = e.popup._contentNode.querySelector('.popup-del');
+        if(btn){
+          btn.addEventListener('click', ()=> deleteSighting(s.id));
+        }
+      });
+      marker.addTo(markerLayer);
+    });
+  }
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ---------- RENDER: JOURNAL ----------
+function renderJournal(){
+  const list = filteredSightings();
+  const container = document.getElementById('journalList');
+  if(list.length === 0){
+    container.innerHTML = `<div class="empty-state">No sightings logged yet for the selected species.<br>Tap the map to add the first one.</div>`;
+    return;
+  }
+  container.innerHTML = list.map(s=>{
+    const cfg = SPECIES[s.species] || SPECIES.other;
+    const label = s.species === 'other' && s.customLabel ? s.customLabel : cfg.label;
+    const dt = new Date(s.timestamp);
+    const canDelete = auth.currentUser && s.reporterId === auth.currentUser.uid;
+    return `
+      <div class="journal-card" style="border-left-color:${cfg.color}">
+        ${canDelete ? `<button class="del" data-id="${s.id}" title="Delete">✕</button>` : ''}
+        <div class="top-row">
+          <div class="species-tag">${cfg.emoji} ${escapeHtml(label)}</div>
+        </div>
+        <div class="ts">${dt.toLocaleString()}${s.reporterName ? ' · logged by ' + escapeHtml(s.reporterName) : ''}</div>
+        ${s.notes ? `<div class="notes">${escapeHtml(s.notes)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+  container.querySelectorAll('.del').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteSighting(btn.dataset.id));
+  });
+}
+
+// ---------- RENDER: PATTERNS ----------
+function renderPatterns(){
+  const list = filteredSightings();
+  document.getElementById('statTotal').textContent = list.length;
+
+  const hourCounts = new Array(24).fill(0);
+  const monthCounts = new Array(12).fill(0);
+  const speciesCounts = {};
+
+  list.forEach(s=>{
+    const dt = new Date(s.timestamp);
+    hourCounts[dt.getHours()]++;
+    monthCounts[dt.getMonth()]++;
+    const key = s.species === 'other' && s.customLabel ? ('other:' + s.customLabel) : s.species;
+    speciesCounts[key] = (speciesCounts[key]||0) + 1;
+  });
+
+  // peak hour
+  let peakHour = 0, peakHourVal = -1;
+  hourCounts.forEach((c,i)=>{ if(c > peakHourVal){ peakHourVal = c; peakHour = i; } });
+  document.getElementById('statHour').textContent = list.length ? formatHourRange(peakHour) : '—';
+
+  // most seen species
+  let topKey = null, topVal = -1;
+  Object.entries(speciesCounts).forEach(([k,v])=>{ if(v>topVal){ topVal=v; topKey=k; } });
+  let topLabel = '—';
+  if(topKey){
+    if(topKey.startsWith('other:')) topLabel = topKey.slice(6);
+    else topLabel = SPECIES[topKey] ? SPECIES[topKey].emoji : '';
+    if(SPECIES[topKey]) topLabel = SPECIES[topKey].emoji + ' ' + SPECIES[topKey].label;
+  }
+  document.getElementById('statSpecies').textContent = topLabel;
+
+  drawBars('hourBars', hourCounts, peakHour);
+  const peakMonth = monthCounts.indexOf(Math.max(...monthCounts));
+  drawBars('monthBars', monthCounts, list.length ? peakMonth : -1);
+
+  // legend
+  const legend = document.getElementById('legendRow');
+  legend.innerHTML = Object.entries(SPECIES).map(([k,cfg])=>
+    `<div class="legend-item"><span class="dot" style="background:${cfg.color}"></span>${cfg.emoji} ${cfg.label}</div>`
+  ).join('');
+}
+
+function formatHourRange(h){
+  const fmt = (hr)=>{
+    const period = hr < 12 ? 'AM' : 'PM';
+    let hh = hr % 12; if(hh===0) hh = 12;
+    return hh + period;
+  };
+  return `${fmt(h)}–${fmt((h+1)%24)}`;
+}
+
+function drawBars(containerId, counts, peakIndex){
+  const max = Math.max(1, ...counts);
+  const container = document.getElementById(containerId);
+  container.innerHTML = counts.map((c,i)=>{
+    const pct = Math.round((c / max) * 100);
+    const cls = i === peakIndex && c > 0 ? 'bar peak' : 'bar';
+    return `<div class="${cls}" style="height:${pct}%" title="${c} sighting${c===1?'':'s'}"></div>`;
+  }).join('');
+}
+
+// ---------- ALL ----------
+function renderAll(){
+  renderMap();
+  renderJournal();
+  renderPatterns();
+  document.getElementById('totalStamp').textContent = `${sightings.length} sighting${sightings.length===1?'':'s'} logged`;
+}
+
+// ---------- PROFILE / SIGN-IN ----------
+const signinOverlay = document.getElementById('signinOverlay');
+const signinError = document.getElementById('signinError');
+const googleBtn = document.getElementById('googleBtn');
+const userBadge = document.getElementById('userBadge');
+const nameDisplay = document.getElementById('nameDisplay');
+const switchUserBtn = document.getElementById('switchUserBtn');
+
+function showSignedInBadge(){
+  nameDisplay.textContent = profile.name;
+  userBadge.style.display = 'flex';
+}
+
+googleBtn.addEventListener('click', async ()=>{
+  signinError.textContent = '';
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try{
+    await auth.signInWithPopup(provider);
+    // onAuthStateChanged below handles the rest
+  }catch(e){
+    if(e.code === 'auth/unauthorized-domain'){
+      signinError.textContent = "This domain isn't authorized for sign-in yet. Add it under Firebase Console > Authentication > Settings > Authorized domains.";
+    } else if(e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user'){
+      signinError.textContent = 'The sign-in window was blocked or closed. Please try again.';
+    } else {
+      signinError.textContent = 'Sign-in failed: ' + e.message;
+    }
+  }
+});
+
+switchUserBtn.addEventListener('click', ()=>{
+  auth.signOut();
+});
+
+auth.onAuthStateChanged((user)=>{
+  if(user){
+    profile = { name: user.displayName || user.email || 'Watcher', uid: user.uid };
+    showSignedInBadge();
+    signinOverlay.style.display = 'none';
+    startSightingsListener();
+  } else {
+    profile = null;
+    userBadge.style.display = 'none';
+    signinOverlay.style.display = 'flex';
+    if(unsubscribeSightings){ unsubscribeSightings(); unsubscribeSightings = null; }
+    sightings = [];
+    renderAll();
+  }
+});
+
+// ---------- INIT ----------
+updateSubmitState();
+</script>
+</body>
+</html>
