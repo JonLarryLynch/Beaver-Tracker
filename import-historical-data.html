@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import Historical Sightings — Lincoln Park Wildlife Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --forest:#1B2E1F; --moss:#3F5C42; --amber:#D9A441; --rust:#B2472A;
+    --parchment:#F4EFE3; --parchment-dark:#E9E1CF; --ink:#2A2620; --ink-soft:#5A5346; --line:#D8CFB8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Inter',sans-serif; background:var(--forest); color:var(--ink);
+    min-height:100vh; padding:32px 18px;
+  }
+  .wrap{max-width:640px;margin:0 auto;background:var(--parchment);border-radius:14px;padding:30px 32px;box-shadow:0 10px 30px rgba(0,0,0,0.35);}
+  h1{font-family:'Fraunces',serif;font-size:23px;color:var(--forest);margin:0 0 6px;}
+  p{font-size:13.5px;line-height:1.55;color:var(--ink-soft);}
+  .step{margin-top:26px;padding-top:22px;border-top:1px solid var(--line);}
+  .step h2{font-family:'Fraunces',serif;font-size:16px;color:var(--forest);margin:0 0 8px;}
+  input[type=file]{
+    width:100%;padding:10px;border:1.5px dashed var(--line);border-radius:8px;background:#fff;font-size:13px;
+  }
+  select{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:7px;font-size:13px;background:#fff;}
+  .btn{
+    background:var(--forest);color:var(--parchment);border:none;padding:11px 18px;border-radius:8px;
+    font-weight:700;font-size:13.5px;cursor:pointer;margin-top:10px;
+  }
+  .btn:disabled{background:#9aa79c;cursor:not-allowed;}
+  .btn.danger{background:var(--rust);}
+  .summary{
+    background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:14px;font-size:13px;
+  }
+  .summary table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .summary td{padding:3px 4px;}
+  .summary td.count{text-align:right;font-family:'JetBrains Mono',monospace;}
+  .unmatched{color:var(--rust);}
+  .log{
+    background:#111;color:#9fe0a0;font-family:'JetBrains Mono',monospace;font-size:11.5px;
+    border-radius:8px;padding:12px;margin-top:12px;max-height:200px;overflow-y:auto;white-space:pre-wrap;
+  }
+  .note{
+    background:var(--parchment-dark);border:1px dashed var(--line);border-radius:7px;padding:10px 12px;
+    font-size:12px;margin-top:14px;
+  }
+  a{color:var(--moss);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🦫 Import historical sightings</h1>
+  <p>
+    This is a one-time bulk-loading tool, not part of the public site. It reads a CSV export of real
+    wildlife observations (from iNaturalist, GBIF, or eBird) and adds them to your Firestore
+    <code>sightings</code> collection as historical records, so the map and Patterns tab have a real
+    starting dataset instead of an empty one.
+  </p>
+
+  <div class="step">
+    <h2>1. Get a CSV export</h2>
+    <p>
+      The easiest source: go to
+      <a href="https://www.inaturalist.org/observations" target="_blank" rel="noopener">inaturalist.org/observations</a>,
+      use the location filter to search "Lincoln Park, Chicago" (or draw a custom box around the park),
+      optionally filter by species if you only want certain animals, then use the
+      <strong>Filters → Download</strong> option to request a CSV export. iNaturalist emails you a
+      download link, usually within a few minutes. GBIF.org and eBird's "Explore Data" tool work
+      similarly if you want a broader or bird-specific dataset instead.
+    </p>
+  </div>
+
+  <div class="step">
+    <h2>2. Upload the CSV here</h2>
+    <input type="file" id="csvFile" accept=".csv">
+    <div id="parseSummary"></div>
+  </div>
+
+  <div class="step">
+    <h2>3. Import</h2>
+    <p>Each imported row is tagged <code>source: "historical-import"</code> so you can tell it apart from real community sightings later if you ever want to. Running this twice on the same file won't create duplicates, it uses each observation's original ID.</p>
+    <button class="btn" id="importBtn" disabled>Import into Firestore</button>
+    <div class="log" id="log" style="display:none;"></div>
+  </div>
+
+  <div class="note">
+    <strong>A note on attribution:</strong> most iNaturalist and GBIF observations are shared under
+    Creative Commons licenses that ask for credit to the original observer. This tool keeps a link
+    back to the original observation in each imported sighting's notes for that reason. Worth a quick
+    read of the license column in your export before publishing anything drawn from someone else's photo.
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAVBgpe-jt7zc1zhqpxvFidtE3Mq_5-bnM",
+  authDomain: "the-beaver-project.firebaseapp.com",
+  databaseURL: "https://the-beaver-project-default-rtdb.firebaseio.com",
+  projectId: "the-beaver-project",
+  storageBucket: "the-beaver-project.firebasestorage.app",
+  messagingSenderId: "796121700492",
+  appId: "1:796121700492:web:8f9d51e59d5cfcdc5843a9",
+  measurementId: "G-WZTT98KFMD"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const sightingsCollection = db.collection('sightings');
+
+auth.signInAnonymously().catch(e => console.error('Anonymous sign-in failed', e));
+
+// Same species keys/labels as the main site, kept in sync manually.
+const SPECIES = {
+  beaver:'Beaver', coyote:'Coyote', fox:'Red Fox', deer:'White-tailed Deer', raccoon:'Raccoon',
+  opossum:'Virginia Opossum', gray_squirrel:'Eastern Gray Squirrel', cottontail:'Eastern Cottontail',
+  skunk:'Striped Skunk', groundhog:'Groundhog', muskrat:'Muskrat', otter:'River Otter',
+  little_brown_bat:'Little Brown Bat', canada_goose:'Canada Goose', mallard:'Mallard Duck',
+  great_blue_heron:'Great Blue Heron', red_tailed_hawk:'Red-tailed Hawk', bald_eagle:'Bald Eagle',
+  great_horned_owl:'Great Horned Owl', wild_turkey:'Wild Turkey', sandhill_crane:'Sandhill Crane',
+  painted_turtle:'Painted Turtle', snapping_turtle:'Snapping Turtle', garter_snake:'Garter Snake',
+  bullfrog:'American Bullfrog'
+};
+
+// Maps common-name text (lowercased, as it tends to appear in exports) to our species keys.
+const NAME_MAP = {
+  'beaver':'beaver', 'american beaver':'beaver', 'north american beaver':'beaver',
+  'coyote':'coyote',
+  'red fox':'fox',
+  'white-tailed deer':'deer', 'white tailed deer':'deer',
+  'raccoon':'raccoon', 'northern raccoon':'raccoon',
+  'virginia opossum':'opossum', 'opossum':'opossum',
+  'eastern gray squirrel':'gray_squirrel', 'gray squirrel':'gray_squirrel', 'grey squirrel':'gray_squirrel',
+  'eastern cottontail':'cottontail', 'cottontail':'cottontail', 'cottontail rabbit':'cottontail',
+  'striped skunk':'skunk',
+  'groundhog':'groundhog', 'woodchuck':'groundhog',
+  'muskrat':'muskrat',
+  'north american river otter':'otter', 'river otter':'otter', 'northern river otter':'otter',
+  'little brown bat':'little_brown_bat', 'little brown myotis':'little_brown_bat',
+  'canada goose':'canada_goose',
+  'mallard':'mallard',
+  'great blue heron':'great_blue_heron',
+  'red-tailed hawk':'red_tailed_hawk', 'red tailed hawk':'red_tailed_hawk',
+  'bald eagle':'bald_eagle',
+  'great horned owl':'great_horned_owl',
+  'wild turkey':'wild_turkey',
+  'sandhill crane':'sandhill_crane',
+  'painted turtle':'painted_turtle', 'eastern painted turtle':'painted_turtle', 'midland painted turtle':'painted_turtle',
+  'common snapping turtle':'snapping_turtle', 'snapping turtle':'snapping_turtle',
+  'common garter snake':'garter_snake', 'garter snake':'garter_snake', 'eastern garter snake':'garter_snake',
+  'american bullfrog':'bullfrog', 'bullfrog':'bullfrog'
+};
+
+function matchSpecies(commonName, scientificName){
+  const name = (commonName || '').trim().toLowerCase();
+  if(NAME_MAP[name]) return { key: NAME_MAP[name], custom: '' };
+  // try partial match, e.g. "Eastern Gray Squirrel (subspecies)"
+  for(const [k,v] of Object.entries(NAME_MAP)){
+    if(name.includes(k)) return { key: v, custom: '' };
+  }
+  return { key: 'other', custom: commonName || scientificName || 'Unidentified' };
+}
+
+function toIsoTimestamp(row){
+  // Prefer a full timestamp if the export has one, fall back to just the date at noon.
+  const full = row.time_observed_at || row.eventDate || row.observed_on_string;
+  if(full){
+    const d = new Date(full);
+    if(!isNaN(d)) return d.toISOString();
+  }
+  const dateOnly = row.observed_on || row.eventDate;
+  if(dateOnly){
+    const d = new Date(dateOnly + 'T12:00:00');
+    if(!isNaN(d)) return d.toISOString();
+  }
+  return null;
+}
+
+let parsedRows = [];
+
+document.getElementById('csvFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  Papa.parse(file, {
+    header:true,
+    skipEmptyLines:true,
+    complete: (results)=>{
+      const counts = {};
+      let skipped = 0;
+      parsedRows = [];
+      results.data.forEach(row=>{
+        const lat = parseFloat(row.latitude || row.decimalLatitude);
+        const lng = parseFloat(row.longitude || row.decimalLongitude);
+        const ts = toIsoTimestamp(row);
+        if(isNaN(lat) || isNaN(lng) || !ts){ skipped++; return; }
+        const commonName = row.common_name || row.vernacularName || '';
+        const sciName = row.scientific_name || row.scientificName || '';
+        const match = matchSpecies(commonName, sciName);
+        counts[match.key] = (counts[match.key]||0) + 1;
+        const sourceUrl = row.url || row.occurrenceID || row.references || '';
+        parsedRows.push({
+          id: 'hist-' + (row.id || row.gbifID || row.observation_uuid || (lat+'-'+lng+'-'+ts)),
+          species: match.key,
+          customLabel: match.custom,
+          lat, lng,
+          timestamp: ts,
+          notes: [row.place_guess, sourceUrl ? ('Source: ' + sourceUrl) : ''].filter(Boolean).join(' — '),
+          reporterName: 'Historical import',
+          reporterId: null,
+          source: 'historical-import'
+        });
+      });
+
+      const summary = document.getElementById('parseSummary');
+      const rows = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+        `<tr><td>${SPECIES[k] || (k==='other' ? 'Other / unmatched' : k)}</td><td class="count">${v}</td></tr>`
+      ).join('');
+      summary.innerHTML = `
+        <div class="summary">
+          <strong>${parsedRows.length}</strong> rows ready to import
+          ${skipped ? `, <span class="unmatched">${skipped} skipped</span> (missing coordinates or date)` : ''}.
+          <table>${rows}</table>
+        </div>
+      `;
+      document.getElementById('importBtn').disabled = parsedRows.length === 0;
+    }
+  });
+});
+
+document.getElementById('importBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('importBtn');
+  const log = document.getElementById('log');
+  log.style.display = 'block';
+  log.textContent = '';
+  btn.disabled = true;
+
+  const chunkSize = 400; // stay comfortably under Firestore's 500-op batch limit
+  let written = 0;
+  for(let i=0; i<parsedRows.length; i+=chunkSize){
+    const chunk = parsedRows.slice(i, i+chunkSize);
+    const batch = db.batch();
+    chunk.forEach(entry=>{
+      batch.set(sightingsCollection.doc(entry.id), entry, { merge:true });
+    });
+    try{
+      await batch.commit();
+      written += chunk.length;
+      log.textContent += `Imported ${written} / ${parsedRows.length}...\n`;
+      log.scrollTop = log.scrollHeight;
+    }catch(e){
+      log.textContent += `Error on batch starting at row ${i}: ${e.message}\n`;
+      break;
+    }
+  }
+  log.textContent += 'Done.';
+  btn.textContent = 'Import complete';
+});
+</script>
+</body>
+</html>
