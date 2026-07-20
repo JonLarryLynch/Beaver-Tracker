@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lincoln Park Wildlife Watch</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B2E1F">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -181,7 +185,10 @@
     letter-spacing:0.3px;
     cursor:pointer;
     color:var(--ink-soft);
+    border:none;
     border-bottom:3px solid transparent;
+    background:none;
+    appearance:none;
     text-transform:uppercase;
   }
   .tab.active{
@@ -504,6 +511,139 @@
   }
 
   #map.pin-ready{cursor:crosshair;}
+
+  /* ---------- EDIT MODE ---------- */
+  .edit-banner{
+    background:var(--parchment-dark);
+    border:1px solid var(--moss);
+    border-radius:7px;
+    padding:9px 11px;
+    font-size:12px;
+    color:var(--forest);
+    margin-bottom:14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .cancel-edit-link{
+    background:none;
+    border:none;
+    color:var(--rust);
+    text-decoration:underline;
+    cursor:pointer;
+    font-size:11.5px;
+    font-weight:600;
+  }
+  .edit-link{
+    background:none;
+    border:none;
+    color:var(--moss);
+    cursor:pointer;
+    font-size:12px;
+    margin-left:4px;
+  }
+
+  /* ---------- PHOTOS ---------- */
+  .photo-preview{
+    display:block;
+    max-width:100%;
+    max-height:160px;
+    border-radius:7px;
+    margin-top:8px;
+    border:1px solid var(--line);
+    object-fit:cover;
+  }
+  .remove-photo-link{
+    background:none;border:none;color:var(--rust);
+    font-size:11px;text-decoration:underline;cursor:pointer;
+    margin-top:6px;padding:0;
+  }
+  .journal-photo{
+    width:100%;
+    max-height:140px;
+    object-fit:cover;
+    border-radius:6px;
+    margin-top:6px;
+    display:block;
+  }
+  .popup-photo{
+    width:100%;
+    max-height:120px;
+    object-fit:cover;
+    border-radius:5px;
+    margin-top:4px;
+  }
+
+  /* ---------- FLAG / REPORT ---------- */
+  .flag-btn{
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    font-size:11px;
+    cursor:pointer;
+    text-decoration:underline;
+    padding:0;
+    margin-top:4px;
+  }
+  .flag-btn:hover{color:var(--rust);}
+  .card-actions{display:flex;gap:10px;margin-top:4px;}
+
+  /* ---------- NOTIFICATIONS ---------- */
+  .notify-box{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    margin-bottom:16px;
+  }
+  .notify-box .label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    font-weight:700;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .notify-row{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:5px;}
+  .notify-row input{width:auto;}
+  .toast{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:var(--forest);
+    color:var(--parchment);
+    padding:11px 18px;
+    border-radius:8px;
+    font-size:13px;
+    z-index:3000;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    max-width:80vw;
+  }
+
+  /* ---------- CSV EXPORT ---------- */
+  .export-btn{
+    width:100%;
+    background:var(--moss);
+    color:#fff;
+    border:none;
+    padding:9px;
+    border-radius:7px;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+    margin-top:6px;
+  }
+
+  /* ---------- ACCESSIBILITY ---------- */
+  .tab, .chip{
+    font-family:'Inter',sans-serif;
+  }
+  button{font-family:inherit;}
+  :focus-visible{
+    outline:2px solid var(--amber);
+    outline-offset:2px;
+  }
 </style>
 </head>
 <body>
@@ -532,7 +672,7 @@
 
 <div class="app">
   <div class="map-wrap">
-    <div id="map"></div>
+    <div id="map" role="application" aria-label="Interactive map of Lincoln Park for viewing and logging wildlife sightings"></div>
     <div class="species-filter">
       <div class="label">Show on map</div>
       <div class="chip-row" id="chipRow"></div>
@@ -551,15 +691,19 @@
   </div>
 
   <div class="sidebar">
-    <div class="tabs">
-      <div class="tab active" data-tab="log">Log Sighting</div>
-      <div class="tab" data-tab="journal">Field Journal</div>
-      <div class="tab" data-tab="patterns">Patterns</div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="log" role="tab" aria-selected="true">Log Sighting</button>
+      <button class="tab" data-tab="journal" role="tab" aria-selected="false">Field Journal</button>
+      <button class="tab" data-tab="patterns" role="tab" aria-selected="false">Patterns</button>
     </div>
 
     <div class="panel active" id="panel-log">
+      <div class="edit-banner" id="editBanner" style="display:none;">
+        Editing an existing sighting.
+        <button class="cancel-edit-link" id="cancelEditBtn" type="button">Cancel</button>
+      </div>
       <div class="field">
-        <label>Species</label>
+        <label for="speciesSelect">Species</label>
         <select id="speciesSelect">
           <option value="" selected>— Choose a species first —</option>
           <option value="beaver">🦫 Beaver</option>
@@ -569,24 +713,31 @@
         </select>
       </div>
       <div class="field" id="customLabelField" style="display:none;">
-        <label>What did you see?</label>
+        <label for="customLabel">What did you see?</label>
         <input type="text" id="customLabel" placeholder="e.g. Great Blue Heron, White-tailed Deer">
       </div>
       <div class="field">
-        <label>Location</label>
-        <div class="coord-box" id="coordBox">Pick a species above, then click the map</div>
+        <label id="locationLabel">Location</label>
+        <div class="coord-box" id="coordBox" aria-live="polite">Pick a species above, then click the map</div>
       </div>
       <div class="field">
-        <label>Date &amp; time seen</label>
+        <label for="tsInput">Date &amp; time seen</label>
         <input type="datetime-local" id="tsInput">
       </div>
       <div class="hint">Defaults to right now — change it if you're logging a sighting from earlier.</div>
       <div class="field">
-        <label>Notes (optional)</label>
+        <label for="notesInput">Notes (optional)</label>
         <textarea id="notesInput" placeholder="Behavior, group size, anything worth remembering..."></textarea>
       </div>
+      <div class="field">
+        <label for="photoInput">Photo (optional)</label>
+        <input type="file" id="photoInput" accept="image/*">
+        <div class="hint" style="margin-top:6px;">Up to 5 MB. Helpful for confirming a sighting, never required.</div>
+        <img id="photoPreview" class="photo-preview" style="display:none;" alt="Preview of the photo you're about to attach">
+        <button type="button" class="remove-photo-link" id="removePhotoBtn" style="display:none;">Remove photo</button>
+      </div>
       <button class="submit-btn" id="submitBtn" disabled>Pick a spot on the map first</button>
-      <div class="status-msg" id="statusMsg"></div>
+      <div class="status-msg" id="statusMsg" aria-live="polite"></div>
     </div>
 
     <div class="panel" id="panel-journal">
@@ -594,6 +745,12 @@
     </div>
 
     <div class="panel" id="panel-patterns">
+      <div class="notify-box">
+        <div class="label">Notify me while this tab is open</div>
+        <div id="notifyChecks"></div>
+        <div class="hint" style="margin:6px 0 0;">This only alerts you while the site is open in a browser tab, it can't send notifications when your phone is locked or the tab is closed. That would need a bigger backend upgrade later.</div>
+      </div>
+
       <div class="stat-row">
         <div class="stat-box"><div class="num" id="statTotal">0</div><div class="cap">Total sightings</div></div>
         <div class="stat-box"><div class="num" id="statHour">—</div><div class="cap">Peak hour</div></div>
@@ -615,6 +772,7 @@
       </div>
 
       <div class="legend-row" id="legendRow"></div>
+      <button class="export-btn" id="exportBtn">Export current view as CSV</button>
     </div>
   </div>
 </div>
@@ -624,6 +782,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyAVBgpe-jt7zc1zhqpxvFidtE3Mq_5-bnM",
@@ -638,7 +797,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 const sightingsCollection = db.collection('sightings');
+const flagsCollection = db.collection('flags');
+const usersCollection = db.collection('users');
 
 const SPECIES = {
   beaver: { label:'Beaver', emoji:'🦫', color:'#D9A441' },
@@ -728,9 +890,15 @@ let unsubscribeSightings = null;
 function startSightingsListener(){
   if(unsubscribeSightings) unsubscribeSightings();
   unsubscribeSightings = sightingsCollection.onSnapshot((snapshot)=>{
+    snapshot.docChanges().forEach(change=>{
+      if(change.type === 'added'){
+        maybeNotifyNewSighting(change.doc.data());
+      }
+    });
     sightings = snapshot.docs.map(doc => doc.data());
     sightings.sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
     renderAll();
+    notificationsPrimed = true;
   }, (err)=>{
     console.error('Sightings listener error', err);
   });
@@ -756,6 +924,51 @@ const notesInput = document.getElementById('notesInput');
 const submitBtn = document.getElementById('submitBtn');
 const statusMsg = document.getElementById('statusMsg');
 const coordBox = document.getElementById('coordBox');
+const photoInput = document.getElementById('photoInput');
+const photoPreview = document.getElementById('photoPreview');
+const removePhotoBtn = document.getElementById('removePhotoBtn');
+const editBanner = document.getElementById('editBanner');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+let editingId = null;          // id of the sighting currently being edited, or null when creating new
+let existingPhotoUrl = null;   // photo URL already saved on the sighting being edited
+let selectedPhotoFile = null;  // a newly chosen File awaiting upload
+
+photoInput.addEventListener('change', ()=>{
+  const file = photoInput.files[0];
+  if(!file) return;
+  if(file.size > 5 * 1024 * 1024){
+    statusMsg.textContent = "That photo is over 5 MB, try a smaller one.";
+    statusMsg.className = 'status-msg err';
+    photoInput.value = '';
+    return;
+  }
+  selectedPhotoFile = file;
+  existingPhotoUrl = null;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    photoPreview.src = reader.result;
+    photoPreview.style.display = 'block';
+    removePhotoBtn.style.display = 'inline';
+  };
+  reader.readAsDataURL(file);
+});
+
+removePhotoBtn.addEventListener('click', ()=>{
+  selectedPhotoFile = null;
+  existingPhotoUrl = null;
+  photoInput.value = '';
+  photoPreview.style.display = 'none';
+  removePhotoBtn.style.display = 'none';
+});
+
+async function uploadPhotoIfNeeded(sightingId){
+  if(!selectedPhotoFile) return existingPhotoUrl; // unchanged, or null
+  const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
+  const ref = storage.ref().child(`sightings/${sightingId}/photo.${ext}`);
+  await ref.put(selectedPhotoFile);
+  return await ref.getDownloadURL();
+}
 
 function nowLocalString(){
   const d = new Date();
@@ -788,9 +1001,58 @@ function updateSubmitState(){
     submitBtn.textContent = 'Now click the map to place a pin';
   } else {
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Log this sighting';
+    submitBtn.textContent = editingId ? 'Save changes' : 'Log this sighting';
   }
 }
+
+function resetLogForm(){
+  clearTempMarker();
+  coordBox.textContent = 'Pick a species above, then click the map';
+  coordBox.classList.remove('set');
+  speciesSelect.value = '';
+  customLabelField.style.display = 'none';
+  customLabel.value = '';
+  updateMapCursor();
+  notesInput.value = '';
+  tsInput.value = nowLocalString();
+  photoInput.value = '';
+  photoPreview.style.display = 'none';
+  removePhotoBtn.style.display = 'none';
+  selectedPhotoFile = null;
+  existingPhotoUrl = null;
+  editingId = null;
+  editBanner.style.display = 'none';
+}
+
+function startEdit(s){
+  editingId = s.id;
+  existingPhotoUrl = s.photoUrl || null;
+  selectedPhotoFile = null;
+  speciesSelect.value = s.species;
+  customLabelField.style.display = s.species === 'other' ? 'block' : 'none';
+  customLabel.value = s.customLabel || '';
+  const d = new Date(s.timestamp);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  tsInput.value = d.toISOString().slice(0,16);
+  notesInput.value = s.notes || '';
+  photoInput.value = '';
+  if(existingPhotoUrl){
+    photoPreview.src = existingPhotoUrl;
+    photoPreview.style.display = 'block';
+    removePhotoBtn.style.display = 'inline';
+  } else {
+    photoPreview.style.display = 'none';
+    removePhotoBtn.style.display = 'none';
+  }
+  placeTempMarker(L.latLng(s.lat, s.lng));
+  updateMapCursor();
+  editBanner.style.display = 'flex';
+  statusMsg.textContent = '';
+  document.querySelector('.tab[data-tab="log"]').click();
+  updateSubmitState();
+}
+
+cancelEditBtn.addEventListener('click', resetLogForm);
 
 submitBtn.addEventListener('click', async ()=>{
   if(!pickedLatLng) return;
@@ -806,33 +1068,27 @@ submitBtn.addEventListener('click', async ()=>{
     statusMsg.className = 'status-msg err';
     return;
   }
-  const entry = {
-    id: (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2)),
-    species,
-    customLabel: label,
-    lat: pickedLatLng.lat,
-    lng: pickedLatLng.lng,
-    timestamp: new Date(tsInput.value).toISOString(),
-    notes: notesInput.value.trim(),
-    reporterName: profile ? profile.name : '',
-    reporterId: auth.currentUser ? auth.currentUser.uid : null
-  };
+  const id = editingId || (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Saving...';
+  submitBtn.textContent = selectedPhotoFile ? 'Uploading photo...' : 'Saving...';
   try{
+    const photoUrl = await uploadPhotoIfNeeded(id);
+    const entry = {
+      id,
+      species,
+      customLabel: label,
+      lat: pickedLatLng.lat,
+      lng: pickedLatLng.lng,
+      timestamp: new Date(tsInput.value).toISOString(),
+      notes: notesInput.value.trim(),
+      reporterName: profile ? profile.name : '',
+      reporterId: auth.currentUser ? auth.currentUser.uid : null,
+      photoUrl: photoUrl || null
+    };
     await saveSighting(entry);
-    statusMsg.textContent = 'Sighting logged. Thanks for keeping watch.';
+    statusMsg.textContent = editingId ? 'Sighting updated.' : 'Sighting logged. Thanks for keeping watch.';
     statusMsg.className = 'status-msg ok';
-    // reset form
-    clearTempMarker();
-    coordBox.textContent = 'Pick a species above, then click the map';
-    coordBox.classList.remove('set');
-    speciesSelect.value = '';
-    customLabelField.style.display = 'none';
-    customLabel.value = '';
-    updateMapCursor();
-    notesInput.value = '';
-    tsInput.value = nowLocalString();
+    resetLogForm();
   }catch(e){
     statusMsg.textContent = 'Something went wrong saving that. Try again.';
     statusMsg.className = 'status-msg err';
@@ -843,9 +1099,10 @@ submitBtn.addEventListener('click', async ()=>{
 // ---------- TABS ----------
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t=>{ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     tab.classList.add('active');
+    tab.setAttribute('aria-selected','true');
     document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
   });
 });
@@ -853,17 +1110,21 @@ document.querySelectorAll('.tab').forEach(tab=>{
 // ---------- SPECIES FILTER CHIPS ----------
 const chipRow = document.getElementById('chipRow');
 Object.entries(SPECIES).forEach(([key, cfg])=>{
-  const chip = document.createElement('div');
+  const chip = document.createElement('button');
+  chip.type = 'button';
   chip.className = 'chip';
   chip.dataset.species = key;
+  chip.setAttribute('aria-pressed','true');
   chip.innerHTML = `<span class="dot" style="background:${cfg.color}"></span>${cfg.emoji} ${cfg.label}`;
   chip.addEventListener('click', ()=>{
     if(activeSpecies.has(key)){
       activeSpecies.delete(key);
       chip.classList.add('off');
+      chip.setAttribute('aria-pressed','false');
     } else {
       activeSpecies.add(key);
       chip.classList.remove('off');
+      chip.setAttribute('aria-pressed','true');
     }
     renderAll();
   });
@@ -897,7 +1158,113 @@ dateToInput.addEventListener('change', ()=>{
   renderAll();
 });
 
-// ---------- RENDER: MAP ----------
+// ---------- CSV EXPORT ----------
+function csvEscape(val){
+  const s = (val === null || val === undefined) ? '' : String(val);
+  if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const list = filteredSightings();
+  const headers = ['species','custom_label','latitude','longitude','timestamp','notes','reported_by','photo_url'];
+  const rows = list.map(s=>{
+    const cfg = SPECIES[s.species] || SPECIES.other;
+    const speciesLabel = s.species === 'other' && s.customLabel ? s.customLabel : cfg.label;
+    return [speciesLabel, s.customLabel||'', s.lat, s.lng, s.timestamp, s.notes||'', s.reporterName||'', s.photoUrl||'']
+      .map(csvEscape).join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lincoln-park-sightings-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// ---------- SPECIES WATCH / NOTIFICATIONS ----------
+let watchSpecies = new Set();
+let notificationsPrimed = false; // becomes true after the first snapshot, so we don't alert on existing data
+
+function renderNotifyChecks(){
+  const container = document.getElementById('notifyChecks');
+  container.innerHTML = Object.entries(SPECIES).map(([key,cfg])=>`
+    <label class="notify-row">
+      <input type="checkbox" data-species="${key}" ${watchSpecies.has(key) ? 'checked' : ''}>
+      ${cfg.emoji} ${cfg.label}
+    </label>
+  `).join('');
+  container.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', async ()=>{
+      const key = cb.dataset.species;
+      if(cb.checked) watchSpecies.add(key); else watchSpecies.delete(key);
+      if(auth.currentUser){
+        await usersCollection.doc(auth.currentUser.uid).set(
+          { watchSpecies: Array.from(watchSpecies) }, { merge:true }
+        );
+      }
+      if(cb.checked && 'Notification' in window && Notification.permission === 'default'){
+        Notification.requestPermission();
+      }
+    });
+  });
+}
+
+async function loadWatchPrefs(uid){
+  try{
+    const doc = await usersCollection.doc(uid).get();
+    watchSpecies = new Set((doc.exists && doc.data().watchSpecies) || []);
+  }catch(e){
+    watchSpecies = new Set();
+  }
+  renderNotifyChecks();
+}
+
+function showToast(msg){
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.setAttribute('role','status');
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(()=> toast.remove(), 6000);
+}
+
+function maybeNotifyNewSighting(s){
+  if(!notificationsPrimed) return;
+  if(!watchSpecies.has(s.species)) return;
+  if(auth.currentUser && s.reporterId === auth.currentUser.uid) return;
+  const cfg = SPECIES[s.species] || SPECIES.other;
+  const label = s.species === 'other' && s.customLabel ? s.customLabel : cfg.label;
+  const msg = `${cfg.emoji} New ${label} sighting logged in Lincoln Park`;
+  showToast(msg);
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{ new Notification('Lincoln Park Wildlife Watch', { body: msg }); }catch(e){ /* ignore */ }
+  }
+}
+async function flagSighting(id){
+  if(!auth.currentUser){
+    alert('Sign in first to report a sighting.');
+    return;
+  }
+  const reason = prompt("What's the issue with this sighting? (optional)") || '';
+  try{
+    await flagsCollection.add({
+      sightingId: id,
+      reason,
+      flaggedBy: auth.currentUser.uid,
+      flaggedByName: profile ? profile.name : '',
+      timestamp: new Date().toISOString()
+    });
+    showToast('Reported. Thanks for keeping an eye out.');
+  }catch(e){
+    alert("Couldn't send that report, try again in a moment.");
+  }
+}
+
 function filteredSightings(){
   return sightings.filter(s=>{
     if(!activeSpecies.has(s.species)) return false;
@@ -923,18 +1290,24 @@ function renderMap(){
       const marker = L.marker([s.lat, s.lng], { icon: speciesDivIcon(s.species) });
       const dt = new Date(s.timestamp);
       const label = s.species === 'other' && s.customLabel ? s.customLabel : cfg.label;
-      const canDelete = auth.currentUser && s.reporterId === auth.currentUser.uid;
+      const isOwner = auth.currentUser && s.reporterId === auth.currentUser.uid;
       marker.bindPopup(`
         <div class="popup-species">${cfg.emoji} ${label}</div>
         <div class="popup-ts">${dt.toLocaleString()}${s.reporterName ? ' · ' + escapeHtml(s.reporterName) : ''}</div>
         ${s.notes ? `<div>${escapeHtml(s.notes)}</div>` : ''}
-        ${canDelete ? `<button class="popup-del" data-id="${s.id}">Delete entry</button>` : ''}
+        ${s.photoUrl ? `<img class="popup-photo" src="${s.photoUrl}" alt="Photo of the ${escapeHtml(label)} sighting">` : ''}
+        <div class="card-actions">
+          ${isOwner ? `<button class="popup-del" data-id="${s.id}">Delete</button><button class="edit-link" data-id="${s.id}">Edit</button>` : `<button class="flag-btn" data-id="${s.id}">Report an issue</button>`}
+        </div>
       `);
       marker.on('popupopen', (e)=>{
-        const btn = e.popup._contentNode.querySelector('.popup-del');
-        if(btn){
-          btn.addEventListener('click', ()=> deleteSighting(s.id));
-        }
+        const node = e.popup._contentNode;
+        const delBtn = node.querySelector('.popup-del');
+        if(delBtn) delBtn.addEventListener('click', ()=> deleteSighting(s.id));
+        const editBtn = node.querySelector('.edit-link');
+        if(editBtn) editBtn.addEventListener('click', ()=>{ map.closePopup(); startEdit(s); });
+        const flagBtn = node.querySelector('.flag-btn');
+        if(flagBtn) flagBtn.addEventListener('click', ()=> flagSighting(s.id));
       });
       marker.addTo(markerLayer);
     });
@@ -959,20 +1332,33 @@ function renderJournal(){
     const cfg = SPECIES[s.species] || SPECIES.other;
     const label = s.species === 'other' && s.customLabel ? s.customLabel : cfg.label;
     const dt = new Date(s.timestamp);
-    const canDelete = auth.currentUser && s.reporterId === auth.currentUser.uid;
+    const isOwner = auth.currentUser && s.reporterId === auth.currentUser.uid;
     return `
       <div class="journal-card" style="border-left-color:${cfg.color}">
-        ${canDelete ? `<button class="del" data-id="${s.id}" title="Delete">✕</button>` : ''}
+        ${isOwner ? `<button class="del" data-id="${s.id}" title="Delete" aria-label="Delete this sighting">✕</button>` : ''}
         <div class="top-row">
           <div class="species-tag">${cfg.emoji} ${escapeHtml(label)}</div>
         </div>
         <div class="ts">${dt.toLocaleString()}${s.reporterName ? ' · logged by ' + escapeHtml(s.reporterName) : ''}</div>
         ${s.notes ? `<div class="notes">${escapeHtml(s.notes)}</div>` : ''}
+        ${s.photoUrl ? `<img class="journal-photo" src="${s.photoUrl}" alt="Photo of the ${escapeHtml(label)} sighting">` : ''}
+        <div class="card-actions">
+          ${isOwner
+            ? `<button class="edit-link" data-id="${s.id}">Edit</button>`
+            : `<button class="flag-btn" data-id="${s.id}">Report an issue</button>`}
+        </div>
       </div>
     `;
   }).join('');
   container.querySelectorAll('.del').forEach(btn=>{
     btn.addEventListener('click', ()=> deleteSighting(btn.dataset.id));
+  });
+  container.querySelectorAll('.edit-link').forEach(btn=>{
+    const s = list.find(x=>x.id === btn.dataset.id);
+    if(s) btn.addEventListener('click', ()=> startEdit(s));
+  });
+  container.querySelectorAll('.flag-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> flagSighting(btn.dataset.id));
   });
 }
 
@@ -1086,6 +1472,8 @@ auth.onAuthStateChanged((user)=>{
     profile = { name: user.displayName || user.email || 'Watcher', uid: user.uid };
     showSignedInBadge();
     signinOverlay.style.display = 'none';
+    notificationsPrimed = false;
+    loadWatchPrefs(user.uid);
     startSightingsListener();
   } else {
     profile = null;
@@ -1093,12 +1481,23 @@ auth.onAuthStateChanged((user)=>{
     signinOverlay.style.display = 'flex';
     if(unsubscribeSightings){ unsubscribeSightings(); unsubscribeSightings = null; }
     sightings = [];
+    watchSpecies = new Set();
+    notificationsPrimed = false;
+    renderNotifyChecks();
     renderAll();
   }
 });
 
 // ---------- INIT ----------
 updateSubmitState();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{
+      // Fine if this fails, e.g. in a preview environment without a real origin.
+    });
+  });
+}
 </script>
 </body>
 </html>
