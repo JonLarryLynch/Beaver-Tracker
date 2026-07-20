@@ -6,7 +6,7 @@
 // NOT cache map tiles, Firestore data, or photos — those genuinely need
 // a connection, which is expected for a live community map.
 
-const CACHE_NAME = 'wildlife-watch-shell-v1';
+const CACHE_NAME = 'wildlife-watch-shell-v2';
 const SHELL_FILES = [
   './',
   './index.html',
