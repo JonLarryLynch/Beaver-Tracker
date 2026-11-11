@@ -1,41 +1,34 @@
-// Lincoln Park Wildlife Watch — minimal service worker
-//
-// This exists mainly to satisfy browsers' "installable app" requirements
-// (a manifest plus a registered service worker). It caches the app shell
-// itself so the page still loads if you're briefly offline, but it does
-// NOT cache map tiles, Firestore data, or photos — those genuinely need
-// a connection, which is expected for a live community map.
+// Lincoln Park Wildlife Watch service worker.
+// Network-first: always try to fetch the latest page, and only fall back to the
+// cached copy when offline. (The old cache-first version kept serving stale pages
+// after every update, which is why fixes only showed up in incognito.)
+const CACHE = 'wildlife-watch-v4';
 
-const CACHE_NAME = 'wildlife-watch-shell-v2';
-const SHELL_FILES = [
-  './',
-  './index.html',
-  './manifest.json'
-];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
-  );
-  self.skipWaiting();
-});
+self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle same-origin navigation/shell requests; let everything else
-  // (Firestore, tiles, Google auth, Storage) go straight to the network.
-  const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // Firebase, map tiles, CDNs go straight to the network
 
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(req)
+      .then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then((hit) => hit || caches.match('./')))
   );
 });

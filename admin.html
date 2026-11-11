@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<title>Moderation · Lincoln Park Wildlife Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@800&display=swap" rel="stylesheet">
+<style>
+  :root{--bark:#2F2419;--sign:#F7F5EF;--bg:#F3F4F1;--card:#fff;--soft:#F3F4F1;--ink:#1B1F1C;--ink-2:#596159;--ink-3:#8A918B;--line:rgba(27,31,28,.1);--lake:#2C6A8A;--accent:#E3A23B;--accent-soft:rgba(227,162,59,.16);--danger:#B5452A;
+    --font:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,monospace}
+  @media (prefers-color-scheme:dark){:root{--bg:#141614;--card:#1D201E;--soft:#262A27;--ink:#ECEFEC;--ink-2:#A6AEA8;--ink-3:#757D77;--line:rgba(255,255,255,.1);--lake:#7AB9DA;--danger:#E27A5E}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font:inherit;cursor:pointer}
+  .top{background:var(--bark);color:var(--sign);padding:12px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .top h1{margin:0;font-family:'Overpass',var(--font);font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .top .who{margin-left:auto;font-size:13px;opacity:.85}
+  .wrap{max-width:860px;margin:0 auto;padding:20px 16px 60px}
+  .card{background:var(--card);border-radius:14px;padding:18px;margin-bottom:14px}
+  .btn{border:0;background:var(--soft);color:var(--ink);border-radius:10px;padding:8px 14px;font-weight:600;font-size:14px;min-height:36px}
+  .btn-primary{background:var(--accent);color:#382806}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn:disabled{opacity:.5;cursor:default}
+  .linkbtn{background:none;border:0;padding:0;color:var(--sign);text-decoration:underline;font-size:13px}
+  .tabs{display:flex;gap:6px;margin-bottom:14px}
+  .tab{border:0;background:var(--card);border-radius:999px;padding:7px 15px;font-weight:600;font-size:14px;color:var(--ink)}
+  .tab[aria-selected="true"]{background:var(--ink);color:var(--card)}
+  .item{display:flex;gap:12px;background:var(--card);border-radius:12px;padding:12px;margin-bottom:8px}
+  .item .e{font-size:26px;flex:none}
+  .item .b{flex:1;min-width:0}
+  .item .t{font-weight:700}
+  .item .m{font-size:13px;color:var(--ink-2)}
+  .item .n{margin-top:4px}
+  .ph{width:72px;height:72px;border-radius:10px;flex:none;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px;overflow:hidden}
+  .ph img{width:100%;height:100%;object-fit:cover}
+  .reason{background:var(--accent-soft);border-radius:8px;padding:7px 10px;margin-top:6px;font-size:14px}
+  .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .mono{font-family:var(--mono);font-size:12px;word-break:break-all}
+  code{font-family:var(--mono);background:var(--soft);border-radius:5px;padding:1px 5px;font-size:13px}
+  ol li{margin:4px 0}
+  .muted{color:var(--ink-3)}
+  .empty{text-align:center;color:var(--ink-2);padding:24px}
+  .status{font-size:14px;color:var(--ink-2);margin:0 0 10px}
+  .err{color:var(--danger);font-weight:700}
+  .bd{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+  .dlg{background:var(--card);border-radius:16px;padding:20px;max-width:400px;width:100%}
+  .dlg p{margin:0 0 16px}
+  .dlg .row{display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+<div class="top"><h1>🦫 Wildlife Watch · Moderation</h1><span class="who" id="who"></span></div>
+<div class="wrap" id="app"><div class="card">Loading…</div></div>
+
+<script>
+(function(){
+'use strict';
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAVBgpe-jt7zc1zhqpxvFidtE3Mq_5-bnM",
+  authDomain: "the-beaver-project.firebaseapp.com",
+  projectId: "the-beaver-project",
+  storageBucket: "the-beaver-project.firebasestorage.app",
+  messagingSenderId: "796121700492",
+  appId: "1:796121700492:web:8f9d51e59d5cfcdc5843a9"
+};
+const FB = 'https://www.gstatic.com/firebasejs/10.13.2/';
+const SP = {beaver:'🦫 Beaver',coyote:'🐺 Coyote',fox:'🦊 Red Fox',deer:'🦌 White-tailed Deer',raccoon:'🦝 Raccoon',opossum:'🐀 Virginia Opossum',gray_squirrel:'🐿️ Eastern Gray Squirrel',cottontail:'🐇 Eastern Cottontail',skunk:'🦨 Striped Skunk',groundhog:'🐹 Groundhog',muskrat:'🐀 Muskrat',otter:'🦦 River Otter',little_brown_bat:'🦇 Little Brown Bat',canada_goose:'🪿 Canada Goose',mallard:'🦆 Mallard Duck',great_blue_heron:'🐦 Great Blue Heron',red_tailed_hawk:'🦅 Red-tailed Hawk',bald_eagle:'🦅 Bald Eagle',great_horned_owl:'🦉 Great Horned Owl',wild_turkey:'🦃 Wild Turkey',sandhill_crane:'🐦 Sandhill Crane',painted_turtle:'🐢 Painted Turtle',snapping_turtle:'🐢 Snapping Turtle',garter_snake:'🐍 Garter Snake',bullfrog:'🐸 American Bullfrog'};
+const app = document.getElementById('app');
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const label = s => s.species === 'other' || !SP[s.species] ? '🐾 ' + (s.customLabel || 'Other') : SP[s.species];
+const when = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' }); };
+const safeImg = p => typeof p === 'string' && (/^data:image\//.test(p) || /^https:\/\//.test(p)) ? p : null;
+function load(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('blocked')); document.head.appendChild(s); }); }
+// In-page confirm (works everywhere, unlike the browser's confirm()).
+function ask(msg, okText){
+  return new Promise(res => {
+    const bd = document.createElement('div'); bd.className = 'bd';
+    bd.innerHTML = `<div class="dlg" role="dialog" aria-modal="true"><p>${esc(msg)}</p><div class="row"><button class="btn" data-v="0">Cancel</button><button class="btn btn-danger" data-v="1">${esc(okText || 'Delete')}</button></div></div>`;
+    bd.addEventListener('click', e => { const b = e.target.closest('[data-v]'); if(b || e.target === bd){ bd.remove(); res(!!(b && b.dataset.v === '1')); } });
+    document.body.appendChild(bd); bd.querySelector('[data-v="1"]').focus();
+  });
+}
+
+let db, auth, tab = 'reports';
+
+async function boot(){
+  try{
+    await load(FB + 'firebase-app-compat.js');
+    await Promise.all([load(FB + 'firebase-auth-compat.js'), load(FB + 'firebase-firestore-compat.js')]);
+  }catch(e){
+    app.innerHTML = '<div class="card"><p class="err">Couldn’t load Firebase here.</p><p>Open this page on the live site (your GitHub Pages address followed by <code>/admin.html</code>). It doesn’t work in previews or as a file on your computer.</p></div>';
+    return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  auth = firebase.auth(); db = firebase.firestore();
+  auth.onAuthStateChanged(onUser);
+}
+
+function signInView(msg){
+  document.getElementById('who').textContent = '';
+  app.innerHTML = `<div class="card"><h2 style="margin-top:0">Sign in to moderate</h2>
+    <p>Moderators sign in with Google. Regular visitors never see this page.</p>
+    ${msg ? `<p class="err">${esc(msg)}</p>` : ''}
+    <button class="btn btn-primary" id="gBtn">Sign in with Google</button></div>`;
+  document.getElementById('gBtn').onclick = async () => {
+    try{ await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+    catch(e){
+      signInView(e.code === 'auth/unauthorized-domain'
+        ? 'This web address isn’t on Firebase’s Authorized domains list. Add it under Authentication > Settings > Authorized domains.'
+        : e.code === 'auth/operation-not-allowed' ? 'Google sign-in is turned off. Turn it on under Authentication > Sign-in method.'
+        : 'Sign-in didn’t finish: ' + (e.code || e.message));
+    }
+  };
+}
+
+async function onUser(user){
+  if(!user || user.isAnonymous){ signInView(); return; }
+  document.getElementById('who').innerHTML = `${esc(user.displayName || user.email || 'Signed in')} · <button class="linkbtn" id="outBtn">Sign out</button>`;
+  document.getElementById('outBtn').onclick = () => auth.signOut();
+  let isAdmin = false;
+  try{ isAdmin = (await db.collection('admins').doc(user.uid).get()).exists; }catch(e){ isAdmin = false; }
+  if(!isAdmin){
+    app.innerHTML = `<div class="card"><h2 style="margin-top:0">One-time setup: make yourself a moderator</h2>
+      <p>You’re signed in, but this account isn’t on the moderator list yet. Do this once in the Firebase console:</p>
+      <ol>
+        <li>Go to <b>Firestore Database</b> and click <b>+ Start collection</b>.</li>
+        <li>Collection ID: <code>admins</code></li>
+        <li>Document ID: <code class="mono" id="uid">${esc(user.uid)}</code> <button class="btn" id="copyUid">Copy</button></li>
+        <li>Add one field: <code>role</code> (string) = <code>owner</code>, then <b>Save</b>.</li>
+        <li>Come back here and reload the page.</li>
+      </ol>
+      <p class="muted">That ID belongs to your Google sign-in. The security rules check this list, and nobody can add themselves to it from a web page.</p></div>`;
+    document.getElementById('copyUid').onclick = async () => { try{ await navigator.clipboard.writeText(user.uid); document.getElementById('copyUid').textContent = 'Copied'; }catch(e){} };
+    return;
+  }
+  render();
+}
+
+function render(){
+  app.innerHTML = `<div class="tabs">
+      <button class="tab" data-t="reports" aria-selected="${tab === 'reports'}">Reports</button>
+      <button class="tab" data-t="recent" aria-selected="${tab === 'recent'}">Recent sightings</button>
+    </div><p class="status" id="status">Loading…</p><div id="list"></div>`;
+  app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
+  (tab === 'reports' ? loadReports() : loadRecent()).then(loadPhotos).catch(e => { document.getElementById('status').innerHTML = '<span class="err">Couldn’t load: ' + esc(e.code || e.message) + '</span>'; });
+}
+
+function itemHtml(s, extra){
+  const inline = safeImg(s.photo) || safeImg(s.photoUrl);
+  const ph = inline ? `<div class="ph"><img src="${esc(inline)}" alt=""></div>` : s.hasPhoto ? `<div class="ph" data-photo="${esc(s.id)}">photo</div>` : '';
+  const credit = s.source === 'historical-import' ? ` · imported${s.observer ? ' from ' + esc(s.observer) : ''}${s.license ? ' (' + esc(s.license) + ')' : ''}` : '';
+  return `<div class="item"><div class="e">${label(s).split(' ')[0]}</div><div class="b">
+    <div class="t">${esc(label(s).split(' ').slice(1).join(' '))}${s.count > 1 ? ' × ' + Number(s.count) : ''}</div>
+    <div class="m">${esc(when(s.timestamp))} · ${Number(s.lat).toFixed(4)}, ${Number(s.lng).toFixed(4)} · by ${esc(s.reporterName || 'anonymous')} <span class="mono muted">(${esc(String(s.reporterId || '').slice(0, 8))})</span>${credit}</div>
+    ${s.notes ? `<div class="n">${esc(s.notes)}</div>` : ''}
+    ${extra || ''}
+  </div>${ph}</div>`;
+}
+// Photos are in their own collection; fetch the visible ones after the list renders.
+async function loadPhotos(){
+  const boxes = Array.from(document.querySelectorAll('[data-photo]'));
+  await Promise.all(boxes.map(async box => {
+    try{ const d = await db.collection('photos').doc(box.dataset.photo).get(); const src = d.exists ? safeImg(d.data().data) : null;
+      box.innerHTML = src ? `<img src="${esc(src)}" alt="">` : 'none'; }catch(e){ box.textContent = '—'; }
+  }));
+}
+// Delete a sighting and its photo together.
+async function deleteSighting(id, data){
+  const batch = db.batch();
+  batch.delete(db.collection('sightings').doc(id));
+  if(data && data.hasPhoto) batch.delete(db.collection('photos').doc(id));
+  await batch.commit();
+}
+
+async function loadReports(){
+  const snap = await db.collection('flags').orderBy('timestamp', 'desc').limit(200).get();
+  const status = document.getElementById('status'), list = document.getElementById('list');
+  if(snap.empty){ status.textContent = ''; list.innerHTML = '<div class="empty">No open reports.</div>'; return; }
+  const byS = new Map();
+  snap.docs.forEach(d => { const f = d.data(); if(!byS.has(f.sightingId)) byS.set(f.sightingId, []); byS.get(f.sightingId).push({ id: d.id, ...f }); });
+  status.textContent = `${snap.size} report${snap.size === 1 ? '' : 's'} on ${byS.size} sighting${byS.size === 1 ? '' : 's'}.`;
+  let html = ''; const data = new Map();
+  for(const [sid, flags] of byS){
+    const doc = await db.collection('sightings').doc(sid).get();
+    if(doc.exists) data.set(sid, doc.data());
+    const reasons = flags.map(f => `<div class="reason">“${esc(f.reason || 'No reason given')}” <span class="muted">· ${esc(f.flaggedByName || 'anonymous')}, ${esc(when(f.timestamp))}</span></div>`).join('');
+    const acts = `<div class="acts">${doc.exists ? `<button class="btn btn-danger" data-del="${esc(sid)}">Delete sighting</button>` : ''}<button class="btn" data-dismiss="${esc(sid)}">${doc.exists ? 'Keep it, dismiss report' : 'Clear report'}</button></div>`;
+    html += doc.exists ? itemHtml({ id: sid, ...doc.data() }, reasons + acts) : `<div class="item"><div class="b"><div class="t">Already deleted</div>${reasons}${acts}</div></div>`;
+  }
+  list.innerHTML = html;
+  list.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if(!await ask('Delete this sighting for everyone?')) return;
+    b.disabled = true;
+    await deleteSighting(b.dataset.del, data.get(b.dataset.del));
+    await clearFlags(b.dataset.del); render();
+  });
+  list.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = async () => { b.disabled = true; await clearFlags(b.dataset.dismiss); render(); });
+}
+async function clearFlags(sid){
+  const snap = await db.collection('flags').where('sightingId', '==', sid).get();
+  await Promise.all(snap.docs.map(d => d.ref.delete()));
+}
+
+async function loadRecent(){
+  const snap = await db.collection('sightings').orderBy('timestamp', 'desc').limit(150).get();
+  const status = document.getElementById('status'), list = document.getElementById('list');
+  const data = new Map(snap.docs.map(d => [d.id, d.data()]));
+  status.textContent = `Newest ${snap.size} sightings. Use “Remove everything from this person” to clean up a spam run in one go.`;
+  list.innerHTML = snap.docs.map(d => { const s = { id: d.id, ...d.data() };
+    return itemHtml(s, `<div class="acts"><button class="btn btn-danger" data-del="${esc(s.id)}">Delete</button>${s.reporterId ? `<button class="btn" data-wipe="${esc(s.reporterId)}">Remove everything from this person</button>` : ''}</div>`);
+  }).join('') || '<div class="empty">No sightings yet.</div>';
+  list.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if(!await ask('Delete this sighting for everyone?')) return;
+    b.disabled = true; await deleteSighting(b.dataset.del, data.get(b.dataset.del)); render();
+  });
+  list.querySelectorAll('[data-wipe]').forEach(b => b.onclick = async () => {
+    const q = await db.collection('sightings').where('reporterId', '==', b.dataset.wipe).get();
+    if(!await ask(`Delete all ${q.size} sightings from this person? This can’t be undone.`, 'Delete all')) return;
+    b.disabled = true; b.textContent = 'Deleting…';
+    for(const d of q.docs) await deleteSighting(d.id, d.data());
+    render();
+  });
+}
+
+boot();
+})();
+</script>
+</body>
+</html>

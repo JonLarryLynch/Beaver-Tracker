@@ -1,11 +1,12 @@
 {
   "name": "Lincoln Park Wildlife Watch",
   "short_name": "Wildlife Watch",
-  "description": "A community-kept record of wildlife sightings in Lincoln Park, Chicago.",
-  "start_url": "/",
+  "description": "A community log of wildlife sightings in Lincoln Park, Chicago.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#1B2E1F",
-  "theme_color": "#1B2E1F",
+  "background_color": "#E9ECE6",
+  "theme_color": "#2F2419",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
